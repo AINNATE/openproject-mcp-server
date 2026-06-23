@@ -269,6 +269,12 @@ class OpenProjectClient:
             payload["_links"]["assignee"] = {
                 "href": f"/api/v3/users/{data['assignee_id']}"
             }
+        if "responsible_id" in data:
+            if "_links" not in payload:
+                payload["_links"] = {}
+            payload["_links"]["responsible"] = {
+                "href": f"/api/v3/users/{data['responsible_id']}"
+            }
         if "version_id" in data:
             if "_links" not in payload:
                 payload["_links"] = {}
@@ -283,6 +289,13 @@ class OpenProjectClient:
             payload["dueDate"] = data["dueDate"]
         if "date" in data:
             payload["date"] = data["date"]
+
+        # Duration: OpenProject's REST API accepts an ISO 8601 duration string
+        # (e.g. "P3D" = 3 working days). When provided alongside startDate the
+        # server computes dueDate using the project calendar, so weekends and
+        # non-working days are handled automatically.
+        if "duration_days" in data and data["duration_days"] is not None:
+            payload["duration"] = f"P{int(data['duration_days'])}D"
 
         # Create work package
         return await self._request("POST", "/work_packages", payload)
@@ -475,6 +488,12 @@ class OpenProjectClient:
             payload["_links"]["assignee"] = {
                 "href": f"/api/v3/users/{data['assignee_id']}"
             }
+        if "responsible_id" in data:
+            if "_links" not in payload:
+                payload["_links"] = {}
+            payload["_links"]["responsible"] = {
+                "href": f"/api/v3/users/{data['responsible_id']}"
+            }
         if "version_id" in data:
             if "_links" not in payload:
                 payload["_links"] = {}
@@ -502,6 +521,11 @@ class OpenProjectClient:
             payload["dueDate"] = data["dueDate"]
         if "date" in data:
             payload["date"] = data["date"]
+
+        # Duration: see create_work_package — accepts working-day count and
+        # OpenProject will recompute dueDate from startDate + duration.
+        if "duration_days" in data and data["duration_days"] is not None:
+            payload["duration"] = f"P{int(data['duration_days'])}D"
 
         return await self._request(
             "PATCH", f"/work_packages/{work_package_id}", payload

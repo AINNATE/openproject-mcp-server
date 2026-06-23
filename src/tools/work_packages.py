@@ -23,7 +23,19 @@ class CreateWorkPackageInput(BaseModel):
     description: Optional[str] = Field(None, description="Detailed description in raw format")
     start_date: Optional[str] = Field(None, description="Start date in ISO format (YYYY-MM-DD)")
     due_date: Optional[str] = Field(None, description="Due date in ISO format (YYYY-MM-DD)")
+    duration_days: Optional[int] = Field(
+        None,
+        description=(
+            "Working-day duration (whole days). Prefer this over due_date when the "
+            "user gives a relative deadline ('in 3 days'); OpenProject computes "
+            "due_date from start_date + duration using the project calendar so "
+            "weekends are handled automatically. If both due_date and duration_days "
+            "are provided, OpenProject uses duration."
+        ),
+        gt=0,
+    )
     assignee_id: Optional[int] = Field(None, description="Assignee user ID", gt=0)
+    responsible_id: Optional[int] = Field(None, description="Accountable/Responsible user ID", gt=0)
     status_id: Optional[int] = Field(None, description="Status ID", gt=0)
     priority_id: Optional[int] = Field(None, description="Priority ID", gt=0)
     version_id: Optional[int] = Field(None, description="Version/milestone ID to assign work package to", gt=0)
@@ -39,8 +51,18 @@ class UpdateWorkPackageInput(BaseModel):
     status_id: Optional[int] = Field(None, description="New status ID", gt=0)
     priority_id: Optional[int] = Field(None, description="New priority ID", gt=0)
     assignee_id: Optional[int] = Field(None, description="New assignee user ID", gt=0)
+    responsible_id: Optional[int] = Field(None, description="New accountable/responsible user ID", gt=0)
     start_date: Optional[str] = Field(None, description="New start date (YYYY-MM-DD)")
     due_date: Optional[str] = Field(None, description="New due date (YYYY-MM-DD)")
+    duration_days: Optional[int] = Field(
+        None,
+        description=(
+            "New working-day duration (whole days). Prefer this over due_date when "
+            "the user gives a relative deadline; OpenProject computes due_date from "
+            "start_date + duration using the project calendar."
+        ),
+        gt=0,
+    )
     percentage_done: Optional[int] = Field(None, description="Progress percentage (0-100)", ge=0, le=100)
     version_id: Optional[int] = Field(None, description="Version/milestone ID to assign work package to", gt=0)
 
@@ -427,6 +449,8 @@ async def create_work_package(input: CreateWorkPackageInput) -> str:
             data["priority_id"] = input.priority_id
         if input.assignee_id:
             data["assignee_id"] = input.assignee_id
+        if input.responsible_id:
+            data["responsible_id"] = input.responsible_id
         if input.version_id:
             data["version_id"] = input.version_id
 
@@ -435,6 +459,8 @@ async def create_work_package(input: CreateWorkPackageInput) -> str:
             data["startDate"] = input.start_date
         if input.due_date:
             data["dueDate"] = input.due_date
+        if input.duration_days is not None:
+            data["duration_days"] = input.duration_days
 
         # Create work package
         result = await client.create_work_package(data)
@@ -443,7 +469,10 @@ async def create_work_package(input: CreateWorkPackageInput) -> str:
         wp_id = result.get("id")
         wp_subject = result.get("subject")
 
-        text = format_success(f"Work package #{wp_id} created successfully!\n\n")
+        # Clickable link to the work package in the OpenProject UI. The model
+        # surfaces this so the user can jump straight to the task.
+        wp_link = f"{client.base_url}/work_packages/{wp_id}"
+        text = format_success(f"Work package [#{wp_id}]({wp_link}) created successfully!\n\n")
         text += f"**Subject**: {wp_subject}\n"
 
         # Add embedded data
@@ -456,11 +485,16 @@ async def create_work_package(input: CreateWorkPackageInput) -> str:
             text += f"**Priority**: {embedded['priority'].get('name', 'Unknown')}\n"
         if "assignee" in embedded:
             text += f"**Assignee**: {embedded['assignee'].get('name', 'Unassigned')}\n"
+        if "responsible" in embedded:
+            text += f"**Accountable**: {embedded['responsible'].get('name', 'None')}\n"
 
         if result.get('startDate'):
             text += f"**Start Date**: {result['startDate']}\n"
         if result.get('dueDate'):
             text += f"**Due Date**: {result['dueDate']}\n"
+        if result.get('duration'):
+            text += f"**Duration**: {result['duration']}\n"
+        text += f"**Link**: {wp_link}\n"
 
         return text
 
@@ -509,6 +543,8 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
             data["priority_id"] = input.priority_id
         if input.assignee_id is not None:
             data["assignee_id"] = input.assignee_id
+        if input.responsible_id is not None:
+            data["responsible_id"] = input.responsible_id
         if input.percentage_done is not None:
             data["percentage_done"] = input.percentage_done
         if input.version_id is not None:
@@ -519,6 +555,8 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
             data["startDate"] = input.start_date
         if input.due_date is not None:
             data["dueDate"] = input.due_date
+        if input.duration_days is not None:
+            data["duration_days"] = input.duration_days
 
         if not data:
             return format_error("No fields provided to update")
@@ -530,7 +568,8 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
         wp_id = result.get("id")
         wp_subject = result.get("subject")
 
-        text = format_success(f"Work package #{wp_id} updated successfully!\n\n")
+        wp_link = f"{client.base_url}/work_packages/{wp_id}"
+        text = format_success(f"Work package [#{wp_id}]({wp_link}) updated successfully!\n\n")
         text += f"**Subject**: {wp_subject}\n"
 
         # Add embedded data
@@ -543,13 +582,18 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
             text += f"**Priority**: {embedded['priority'].get('name', 'Unknown')}\n"
         if "assignee" in embedded:
             text += f"**Assignee**: {embedded['assignee'].get('name', 'Unassigned')}\n"
+        if "responsible" in embedded:
+            text += f"**Accountable**: {embedded['responsible'].get('name', 'None')}\n"
 
         if result.get('startDate'):
             text += f"**Start Date**: {result['startDate']}\n"
         if result.get('dueDate'):
             text += f"**Due Date**: {result['dueDate']}\n"
+        if result.get('duration'):
+            text += f"**Duration**: {result['duration']}\n"
         if 'percentageDone' in result:
             text += f"**Progress**: {result['percentageDone']}%\n"
+        text += f"**Link**: {wp_link}\n"
 
         return text
 
