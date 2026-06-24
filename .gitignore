@@ -208,3 +208,24 @@ __marimo__/
 
 # Claude Code configuration
 CLAUDE.md
+
+# JetBrains IDEs (PyCharm, IntelliJ, etc.)
+.idea/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Local secrets / environment overrides
+.env.local
+.env.*.local
+*.local
