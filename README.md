@@ -459,6 +459,10 @@ Get detailed information about a specific work package.
 **Parameters:**
 - `work_package_id` (integer, required): Work package ID
 
+**Note:** `list_work_packages` and `search_work_packages` return summary rows only
+(subject, status, type, priority, assignee, dates) — they do **not** include the
+description. This is the only tool that returns a work package's full description.
+
 #### 13. `update_work_package`
 Update an existing work package.
 

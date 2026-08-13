@@ -191,6 +191,11 @@ def format_work_package_detail(wp: Dict) -> str:
     else:
         text += f"**Assignee**: Unassigned\n"
 
+    # Accountable/Responsible is in _links
+    responsible_link = links.get("responsible")
+    if responsible_link and responsible_link.get("href"):
+        text += f"**Accountable**: {responsible_link.get('title', 'Unknown')}\n"
+
     # Dates
     if wp.get('startDate'):
         text += f"**Start Date**: {wp['startDate']}\n"
@@ -212,7 +217,7 @@ def format_work_package_detail(wp: Dict) -> str:
             text += f"\n**Description**:\n{desc_text}\n"
 
     # Progress
-    if 'percentageDone' in wp:
+    if wp.get('percentageDone') is not None:
         text += f"\n**Progress**: {wp['percentageDone']}%\n"
 
     return text

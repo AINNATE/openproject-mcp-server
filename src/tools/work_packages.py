@@ -409,6 +409,43 @@ async def search_work_packages(
 
 
 @mcp.tool
+async def get_work_package(work_package_id: int) -> str:
+    """Get full details of a single work package (task), including its description.
+
+    Use this when you need to READ the body/content of a task. The list and search
+    tools only return summary rows (subject, status, type, priority, assignee, dates)
+    and deliberately omit the description - this is the only tool that returns it.
+
+    Args:
+        work_package_id: ID of the work package to read
+
+    Returns:
+        Formatted work package details including the full raw description
+
+    Example:
+        To read the content of task #519:
+        {
+            "work_package_id": 519
+        }
+    """
+    try:
+        client = get_client()
+
+        if work_package_id < 1:
+            return format_error("work_package_id must be >= 1")
+
+        result = await client.get_work_package(work_package_id)
+
+        text = format_work_package_detail(result)
+        text += f"\n**Link**: {client.base_url}/work_packages/{work_package_id}\n"
+
+        return text
+
+    except Exception as e:
+        return format_error(f"Failed to get work package #{work_package_id}: {str(e)}")
+
+
+@mcp.tool
 async def create_work_package(input: CreateWorkPackageInput) -> str:
     """Create a new work package (task) - CRITICAL tool for creating tasks.
 
