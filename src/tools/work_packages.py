@@ -663,6 +663,68 @@ async def delete_work_package(work_package_id: int) -> str:
 
 
 @mcp.tool
+async def attach_work_package_file(
+    work_package_id: int,
+    file_path: str,
+    description: Optional[str] = None
+) -> str:
+    """Attach a local file to a work package (task) as an attachment.
+
+    Uploads a file from the local filesystem (where this MCP server runs) to the
+    given work package. Use this for screenshots, logs, documents, etc.
+
+    Args:
+        work_package_id: ID of the work package to attach the file to
+        file_path: Absolute path to the local file to upload
+        description: Optional description for the attachment
+
+    Returns:
+        Success message with attachment details and download link
+
+    Example:
+        To attach a screenshot to work package #123:
+        {
+            "work_package_id": 123,
+            "file_path": "/Users/alice/Desktop/screenshot.png",
+            "description": "Screenshot showing the bug"
+        }
+    """
+    try:
+        client = get_client()
+
+        if work_package_id < 1:
+            return format_error("work_package_id must be >= 1")
+
+        result = await client.upload_work_package_attachment(
+            work_package_id=work_package_id,
+            file_path=file_path,
+            description=description
+        )
+
+        attachment_id = result.get("id", "N/A")
+        file_name = result.get("fileName", "unknown")
+        file_size = result.get("fileSize")
+
+        text = format_success(f"File attached to work package #{work_package_id} successfully!\n\n")
+        text += f"**Attachment ID**: {attachment_id}\n"
+        text += f"**File name**: {file_name}\n"
+        if file_size is not None:
+            text += f"**Size**: {file_size} bytes\n"
+
+        links = result.get("_links", {})
+        download = links.get("downloadLocation", {}).get("href") or links.get("staticDownloadLocation", {}).get("href")
+        if download:
+            text += f"**Download**: {download}\n"
+
+        text += f"**Work package link**: {client.base_url}/work_packages/{work_package_id}\n"
+
+        return text
+
+    except Exception as e:
+        return format_error(f"Failed to attach file to work package #{work_package_id}: {str(e)}")
+
+
+@mcp.tool
 async def list_types(project_id: Optional[int] = None) -> str:
     """List available work package types (Bug, Task, Feature, etc.).
 

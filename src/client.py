@@ -544,6 +544,84 @@ class OpenProjectClient:
         await self._request("DELETE", f"/work_packages/{work_package_id}")
         return True
 
+    async def upload_work_package_attachment(
+        self, work_package_id: int, file_path: str, description: Optional[str] = None
+    ) -> Dict:
+        """
+        Upload a local file as an attachment on a work package.
+
+        Args:
+            work_package_id: The work package ID
+            file_path: Absolute path to the local file to upload
+            description: Optional description for the attachment
+
+        Returns:
+            Dict: Created attachment data
+        """
+        if not os.path.isfile(file_path):
+            raise Exception(f"File not found: {file_path}")
+
+        file_name = os.path.basename(file_path)
+        metadata: Dict[str, Any] = {"fileName": file_name}
+        if description:
+            metadata["description"] = {"raw": description}
+
+        url = f"{self.base_url}/api/v3/work_packages/{work_package_id}/attachments"
+
+        # Multipart requests must not send our default JSON Content-Type header;
+        # aiohttp sets the correct multipart boundary header itself.
+        headers = {k: v for k, v in self.headers.items() if k.lower() != "content-type"}
+
+        ssl_context = ssl.create_default_context()
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        timeout = aiohttp.ClientTimeout(total=60)
+
+        logger.debug(f"API Request: POST {url} (multipart, file={file_name})")
+
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            try:
+                with open(file_path, "rb") as f:
+                    form = aiohttp.FormData()
+                    form.add_field(
+                        "metadata", json.dumps(metadata), content_type="application/json"
+                    )
+                    form.add_field(
+                        "file", f, filename=file_name, content_type="application/octet-stream"
+                    )
+
+                    request_params = {
+                        "method": "POST",
+                        "url": url,
+                        "headers": headers,
+                        "data": form,
+                    }
+                    if self.proxy:
+                        request_params["proxy"] = self.proxy
+
+                    async with session.request(**request_params) as response:
+                        response_text = await response.text()
+
+                        logger.debug(f"Response status: {response.status}")
+
+                        try:
+                            response_json = (
+                                json.loads(response_text) if response_text else {}
+                            )
+                        except json.JSONDecodeError:
+                            logger.error(f"Invalid JSON response: {response_text[:200]}...")
+                            response_json = {}
+
+                        if response.status >= 400:
+                            raise Exception(
+                                self._format_error_message(response.status, response_text)
+                            )
+
+                        return response_json
+
+            except aiohttp.ClientError as e:
+                logger.error(f"Network error: {str(e)}")
+                raise Exception(f"Network error accessing {url}: {str(e)}")
+
     async def add_work_package_comment(
         self, work_package_id: int, comment: str, internal: bool = False
     ) -> Dict:
