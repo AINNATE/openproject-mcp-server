@@ -500,6 +500,13 @@ class OpenProjectClient:
             payload["_links"]["version"] = {
                 "href": f"/api/v3/versions/{data['version_id']}"
             }
+        if "project_id" in data:
+            # Move to another project
+            if "_links" not in payload:
+                payload["_links"] = {}
+            payload["_links"]["project"] = {
+                "href": f"/api/v3/projects/{data['project_id']}"
+            }
         if "percentage_done" in data:
             payload["percentageDone"] = data["percentage_done"]
         if "parent_id" in data:
