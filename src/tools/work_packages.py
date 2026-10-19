@@ -65,6 +65,15 @@ class UpdateWorkPackageInput(BaseModel):
     )
     percentage_done: Optional[int] = Field(None, description="Progress percentage (0-100)", ge=0, le=100)
     version_id: Optional[int] = Field(None, description="Version/milestone ID to assign work package to", gt=0)
+    project_id: Optional[int] = Field(
+        None,
+        description=(
+            "Move the work package to this project ID. The task's type, assignee, "
+            "accountable and version must be valid in the target project, otherwise "
+            "OpenProject rejects the move."
+        ),
+        gt=0,
+    )
 
 
 @mcp.tool
@@ -561,6 +570,9 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
             "percentage_done": 50,
             "due_date": "2025-01-20"
         }
+
+        To move work package #123 to project 12:
+        {"work_package_id": 123, "project_id": 12}
     """
     try:
         client = get_client()
@@ -586,6 +598,8 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
             data["percentage_done"] = input.percentage_done
         if input.version_id is not None:
             data["version_id"] = input.version_id
+        if input.project_id is not None:
+            data["project_id"] = input.project_id
 
         # Add date fields (use camelCase for API)
         if input.start_date is not None:
@@ -611,6 +625,8 @@ async def update_work_package(input: UpdateWorkPackageInput) -> str:
 
         # Add embedded data
         embedded = result.get("_embedded", {})
+        if input.project_id is not None and "project" in embedded:
+            text += f"**Project**: {embedded['project'].get('name', 'Unknown')}\n"
         if "type" in embedded:
             text += f"**Type**: {embedded['type'].get('name', 'Unknown')}\n"
         if "status" in embedded:
